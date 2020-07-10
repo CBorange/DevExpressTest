@@ -41,5 +41,15 @@ namespace DXApplication2
         {
             controller.AddNewRow();
         }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            controller.RemoveRow();
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+
+        }
     }
 }

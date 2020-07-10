@@ -10,6 +10,7 @@ using DevExpress.DataAccess.Native.Sql;
 using System.Collections;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Windows.Forms;
 
 namespace DXApplication2.Model
 {
@@ -21,11 +22,7 @@ namespace DXApplication2.Model
         {
             get { return loadedTable; }
         }
-        private DataTable originTable;
-        public DataTable OriginTable
-        {
-            get { return originTable; }
-        }
+        private int lastTableRowIndex;
         public GridDataModel()
         {
             loadedTable = new DataTable();
@@ -69,8 +66,8 @@ namespace DXApplication2.Model
                     dr.AcceptChanges();
                 }
 
-                originTable = dt;
-                loadedTable = originTable.Copy();
+                loadedTable = dt;
+                lastTableRowIndex = loadedTable.Rows.Count - 1;
             }
         }
         public void AddRow()
@@ -80,39 +77,70 @@ namespace DXApplication2.Model
         public void DeleteRow()
         {
             if (loadedTable.Rows.Count > 0)
-                loadedTable.Rows.RemoveAt(loadedTable.Rows.Count - 1);
+            {
+                loadedTable.Rows[lastTableRowIndex].Delete();
+                lastTableRowIndex -= 1;
+            }
+        }
+        public void RollbackChanges()
+        {
+            loadedTable.RejectChanges();
         }
         public void UpdateDataChanged()
         {
-            string connectSTR = @"Data Source=C:\Users\Administrator\Desktop\PracticeApp\test.db";
-            using (SQLiteConnection conn = new SQLiteConnection(connectSTR))
+            try
             {
-                conn.Open();
-                SQLiteCommand cmd = new SQLiteCommand(conn);
-                
-                // 데이터 Insert 반영
-                DataTable addedTable = loadedTable.GetChanges(DataRowState.Added);
-                if (addedTable != null)
+                string connectSTR = @"Data Source=C:\Users\Administrator\Desktop\PracticeApp\test.db";
+                using (SQLiteConnection conn = new SQLiteConnection(connectSTR))
                 {
-                    StringBuilder builder = new StringBuilder("INSERT INTO Main VALUES (");
-                    foreach (DataRow row in addedTable.Rows)
+                    conn.Open();
+                    SQLiteCommand cmd = new SQLiteCommand(conn);
+
+                    // 데이터 Delete 반영
+                    Debug.Write(loadedTable.Rows.Count);
+                    DataTable deletedTable = loadedTable.GetChanges(DataRowState.Deleted);
+                   
+                    if (deletedTable != null)
                     {
-                        if (row.RowState == DataRowState.Added)
+                        StringBuilder builder = new StringBuilder($"DELETE FROM Main WHERE {deletedTable.Columns[0].ColumnName} = ");
+                        foreach (DataRow row in deletedTable.Rows)
                         {
-                            object[] items = row.ItemArray;
-                            for (int i = 0; i < items.Length; ++i)
+                            if (row.RowState == DataRowState.Deleted)
                             {
-                                if (i == items.Length - 1)
-                                    builder.Append($"{items[i]});");
-                                else
-                                    builder.Append($"{items[i]}, ");
+
                             }
                         }
                     }
-                    cmd.CommandText = builder.ToString();
-                    cmd.ExecuteNonQuery();
+                    // 데이터 Insert 반영
+                    DataTable addedTable = loadedTable.GetChanges(DataRowState.Added);
+                    if (addedTable != null)
+                    {
+                        StringBuilder builder = new StringBuilder("INSERT INTO Main VALUES (");
+                        foreach (DataRow row in addedTable.Rows)
+                        {
+                            if (row.RowState == DataRowState.Added)
+                            {
+                                object[] items = row.ItemArray;
+                                for (int i = 0; i < items.Length; ++i)
+                                {
+                                    if (i == items.Length - 1)
+                                        builder.Append($"{items[i]});");
+                                    else
+                                        builder.Append($"{items[i]}, ");
+                                }
+                            }
+                        }
+                        cmd.CommandText = builder.ToString();
+                        cmd.ExecuteNonQuery();
+                    }
                 }
             }
+            catch(Exception e)
+            {
+                MessageBox.Show($"저장 실패 : {e.Message}");
+                return;
+            }
+            MessageBox.Show("저장 성공");
         }
     }
 }
